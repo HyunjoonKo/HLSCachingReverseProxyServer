@@ -61,7 +61,7 @@ open class HLSCachingReverseProxyServer {
     }
     
     private func addPlaylistHandler() {
-        self.webServer.addHandler(forMethod: "GET", pathRegex: "^/.*\\.m3u8$", request: GCDWebServerRequest.self) { [weak self] request, completion in
+        webServer.addHandler(forMethod: "GET", pathRegex: "^/.*\\.m3u8$", request: GCDWebServerRequest.self) { [weak self] request, completion in
             guard let self = self else {
                 return completion(GCDWebServerDataResponse(statusCode: 500))
             }
@@ -69,12 +69,11 @@ open class HLSCachingReverseProxyServer {
             guard let originURL = self.originURL(from: request) else {
                 return completion(GCDWebServerErrorResponse(statusCode: 400))
             }
-            
-            var request = URLRequest(url: originURL)
+            var taskRequest = URLRequest(url: originURL)
             if let header = self.options {
-                request.addValue(header, forHTTPHeaderField: "Cookie")
+                taskRequest.addValue(header, forHTTPHeaderField: "Cookie")
             }
-            let task = self.urlSession.dataTask(with: request) { data, response, error in
+            let task = self.urlSession.dataTask(with: taskRequest) { data, response, error in
                 guard let data = data, let response = response else {
                     return completion(GCDWebServerErrorResponse(statusCode: 500))
                 }
@@ -89,7 +88,8 @@ open class HLSCachingReverseProxyServer {
     }
     
     private func addSegmentHandler() {
-        self.webServer.addHandler(forMethod: "GET", pathRegex: "^/.*\\.ts$", request: GCDWebServerRequest.self) { [weak self] request, completion in
+        
+        webServer.addHandler(forMethod: "GET", pathRegex: "^/.*\\.ts$", request: GCDWebServerRequest.self) { [weak self] request, completion in
             guard let self = self else {
                 return completion(GCDWebServerDataResponse(statusCode: 500))
             }
@@ -101,11 +101,11 @@ open class HLSCachingReverseProxyServer {
             if let cachedData = self.cachedData(for: originURL) {
                 return completion(GCDWebServerDataResponse(data: cachedData, contentType: "video/mp2t"))
             }
-            var request = URLRequest(url: originURL)
+            var taskRequest = URLRequest(url: originURL)
             if let header = self.options {
-                request.addValue(header, forHTTPHeaderField: "Cookie")
+                taskRequest.addValue(header, forHTTPHeaderField: "Cookie")
             }
-            let task = self.urlSession.dataTask(with: originURL) { data, response, error in
+            let task = self.urlSession.dataTask(with: taskRequest) { data, response, error in
                 guard let data = data, let response = response else {
                     return completion(GCDWebServerErrorResponse(statusCode: 500))
                 }
@@ -189,7 +189,11 @@ open class HLSCachingReverseProxyServer {
     
     private func cachedData(for resourceURL: URL) -> Data? {
         let key = self.cacheKey(for: resourceURL)
-        return self.cache.object(forKey: key) as? Data
+        let data = self.cache.object(forKey: key) as? Data
+        if data?.count == 0 {
+            return nil
+        }
+        return data
     }
     
     private func saveCacheData(_ data: Data, for resourceURL: URL) {
