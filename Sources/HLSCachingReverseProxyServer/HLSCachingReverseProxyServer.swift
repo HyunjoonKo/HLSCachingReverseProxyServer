@@ -17,7 +17,7 @@ open class HLSCachingReverseProxyServer {
         self.cache = cache ?? PINCache.shared
         self.options = options
         
-        self.addRequestHandlers()
+        addRequestHandlers()
     }
     
     
@@ -56,8 +56,9 @@ open class HLSCachingReverseProxyServer {
     // MARK: Request Handler
     
     private func addRequestHandlers() {
-        self.addPlaylistHandler()
-        self.addSegmentHandler()
+        addPlaylistHandler()
+        addSegmentHandler()
+        addCaptionHandler()
     }
     
     private func addPlaylistHandler() {
@@ -117,6 +118,33 @@ open class HLSCachingReverseProxyServer {
             }
             
             task.resume()
+        }
+    }
+    
+    
+    private func addCaptionHandler() {
+        if let header = self.options {
+            webServer.addHandler(forMethod: "GET", pathRegex: "^/.*\\.vtt$", request: GCDWebServerRequest.self) { [weak self] request, completion in
+                guard let self = self else {
+                    return completion(GCDWebServerDataResponse(statusCode: 500))
+                }
+                
+                guard let originURL = self.originURL(from: request) else {
+                    return completion(GCDWebServerErrorResponse(statusCode: 400))
+                }
+                var taskRequest = URLRequest(url: originURL)
+                taskRequest.addValue(header, forHTTPHeaderField: "Cookie")
+                let task = self.urlSession.dataTask(with: taskRequest) { data, response, error in
+                    guard let data = data, let response = response else {
+                        return completion(GCDWebServerErrorResponse(statusCode: 500))
+                    }
+                    
+                    let contentType = response.mimeType ?? "application/x-mpegurl"
+                    completion(GCDWebServerDataResponse(data: data, contentType: contentType))
+                }
+                
+                task.resume()
+            }
         }
     }
     
