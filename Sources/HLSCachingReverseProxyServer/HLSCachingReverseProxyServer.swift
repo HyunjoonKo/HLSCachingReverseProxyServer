@@ -139,7 +139,7 @@ open class HLSCachingReverseProxyServer {
                         return completion(GCDWebServerErrorResponse(statusCode: 500))
                     }
                     
-                    let contentType = response.mimeType ?? "application/x-mpegurl"
+                    let contentType = response.mimeType ?? "mime/vtt"
                     completion(GCDWebServerDataResponse(data: data, contentType: contentType))
                 }
                 
@@ -194,7 +194,7 @@ open class HLSCachingReverseProxyServer {
     }
     
     private func absoluteURL(from line: String, forOriginURL originURL: URL) -> URL? {
-        guard ["m3u8", "ts"].contains(originURL.pathExtension) else { return nil }
+        guard ["m3u8", "ts", "vtt"].contains(originURL.pathExtension.lowercased()) else { return nil }
         
         if line.hasPrefix("http://") || line.hasPrefix("https://") {
             return URL(string: line)
